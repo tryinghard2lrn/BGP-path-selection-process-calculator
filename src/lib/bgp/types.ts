@@ -24,11 +24,16 @@ export interface BgpRoute {
     isBest: boolean; // Did the CLI mark it as best? (for verification)
 }
 
+export interface DecisionCandidate {
+    routeId: string;
+    value: string | number | boolean;
+    isBest: boolean; // Did it survive this step?
+}
+
 export interface StepResult {
     stepName: string;
-    winnerIds: string[]; // IDs of routes that survived this step
-    loserIds: string[]; // IDs of routes eliminated this step
-    reason: string; // e.g., "Higher Local Preference (200 vs 100)"
+    candidates: DecisionCandidate[];
+    reason: string;
 }
 
 export interface AnalysisResult {

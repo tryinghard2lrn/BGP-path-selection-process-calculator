@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { parse } from '@/lib/bgp/parsers';
 import { compareRoutes } from '@/lib/bgp/engine';
 import { AnalysisResult, BgpRoute } from '@/lib/bgp/types';
-import { AlertCircle, CheckCircle, Info, ChevronDown, ChevronRight, Activity } from 'lucide-react';
+import { CheckCircle, Info, Activity, XCircle, Check } from 'lucide-react';
+import clsx from 'clsx';
 
 export default function BgpCalculator() {
     const [input, setInput] = useState('');
@@ -25,6 +26,11 @@ export default function BgpCalculator() {
             // Fail gracefully
         }
     }, [input]);
+
+    const getRouteName = (id: string) => {
+        const r = routes.find(x => x.id === id);
+        return r ? `Path #${r.index + 1}` : id;
+    };
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
@@ -72,7 +78,7 @@ export default function BgpCalculator() {
                                                 Best Path Selected
                                             </span>
                                             <h3 className="text-lg font-mono font-bold text-emerald-900 mt-2">
-                                                Next Hop: {result.winner.nextHop}
+                                                Path #{result.winner.index + 1} via {result.winner.nextHop}
                                             </h3>
                                             <div className="text-sm text-emerald-700">
                                                 Neighbor: {result.winner.peerIp || 'N/A'} (Router ID: {result.winner.routerId})
@@ -85,32 +91,54 @@ export default function BgpCalculator() {
                                     <div className="grid grid-cols-2 gap-y-2 text-sm text-emerald-800/80 font-mono">
                                         <div>Local Pref: {result.winner.localPref}</div>
                                         <div>Weight: {result.winner.weight}</div>
-                                        <div>AS Path Len: {result.winner.asPathLength}</div>
+                                        <div>AS Path: {result.winner.asPath} ({result.winner.asPathLength})</div>
                                         <div>MED: {result.winner.med}</div>
                                         <div>Origin: {result.winner.origin}</div>
+                                        <div>Type: {result.winner.isIbgp ? 'iBGP' : 'eBGP'}</div>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Decision Log */}
+                            {/* Detailed Decision Matrix */}
                             <div>
-                                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Decision Logic</h3>
-                                <div className="space-y-3">
+                                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Decision Breakdown</h3>
+                                <div className="space-y-4">
                                     {result.steps.map((step, idx) => (
-                                        <div key={idx} className="relative pl-6 border-l-2 border-slate-200">
-                                            {/* Step Marker */}
-                                            <div className={`absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full ${step.loserIds.length > 0 ? 'bg-blue-500' : 'bg-slate-300'}`} />
-
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <div className="text-sm font-medium text-slate-900">{step.stepName}</div>
-                                                    <div className="text-xs text-slate-500 mt-0.5">{step.reason}</div>
-                                                </div>
-                                                {step.loserIds.length > 0 && (
-                                                    <div className="text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded">
-                                                        -{step.loserIds.length} Routes Dropped
-                                                    </div>
+                                        <div key={idx} className="border border-slate-100 rounded-lg overflow-hidden">
+                                            {/* Step Header */}
+                                            <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex justify-between items-center">
+                                                <span className="font-semibold text-slate-700 text-sm">
+                                                    {idx + 1}. {step.stepName}
+                                                </span>
+                                                {step.reason !== 'Tie' && (
+                                                    <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                                                        {step.reason}
+                                                    </span>
                                                 )}
+                                            </div>
+
+                                            {/* Candidates List */}
+                                            <div className="divide-y divide-slate-50">
+                                                {step.candidates.map((cand) => (
+                                                    <div key={cand.routeId} className={clsx(
+                                                        "flex items-center justify-between px-4 py-2 text-sm",
+                                                        cand.isBest ? "bg-white" : "bg-slate-50/50 opacity-60"
+                                                    )}>
+                                                        <div className="flex items-center gap-2">
+                                                            {cand.isBest ? (
+                                                                <Check className="w-4 h-4 text-emerald-500" />
+                                                            ) : (
+                                                                <XCircle className="w-4 h-4 text-red-400" />
+                                                            )}
+                                                            <span className={clsx("font-mono", cand.isBest ? "text-slate-800" : "text-slate-500")}>
+                                                                {getRouteName(cand.routeId)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="font-mono font-medium">
+                                                            {String(cand.value)}
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     ))}
