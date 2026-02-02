@@ -1,4 +1,4 @@
-import { BgpRoute, AnalysisResult, StepResult, Vendor, DecisionCandidate } from './types';
+import { BgpRoute, AnalysisResult, StepResult, Vendor, DecisionCandidate, RankedAnalysis } from './types';
 
 export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco'): AnalysisResult {
     if (routes.length === 0) {
@@ -67,9 +67,7 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco'): Ana
     };
 
     // --- STEPS ---
-
-    // 0. Next Hop Reachability (Mock pass)
-    // recordStep('Next Hop', r => r.isValid, (a, b) => a === true && b === false);
+    // (Existing steps...)
 
     // 1. Weight (High is better)
     recordStep('Weight',
@@ -109,9 +107,8 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco'): Ana
         (a, b) => (a as number) < (b as number)
     );
 
-    // 7. eBGP over iBGP (eBGP=False < iBGP=True in bool coding? No.)
-    // We want eBGP (isIbgp=false) to beat iBGP (isIbgp=true).
-    // So false is "better" than true.
+    // 7. eBGP over iBGP
+    // false (eBGP) > true (iBGP)
     recordStep('eBGP over iBGP',
         r => r.isIbgp ? 'iBGP' : 'eBGP',
         (a, b) => a === 'eBGP' && b === 'iBGP'
@@ -142,5 +139,31 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco'): Ana
     return {
         winner: candidates[0],
         steps,
+    };
+}
+
+export function analyzeAndRank(routes: BgpRoute[], vendor: Vendor = 'cisco'): RankedAnalysis {
+    // 1. Run primary analysis on the full set
+    const primary = compareRoutes(routes, vendor);
+
+    // 2. Recursively find the ranking
+    const pool = [...routes];
+    const ranked: BgpRoute[] = [];
+
+    while (pool.length > 0) {
+        // Find best in current pool
+        const res = compareRoutes(pool, vendor);
+        if (!res.winner) break; // Should not happen
+
+        ranked.push(res.winner);
+
+        // Remove winner from pool
+        const idx = pool.findIndex(r => r.id === res.winner!.id);
+        if (idx !== -1) pool.splice(idx, 1);
+    }
+
+    return {
+        primaryAnalysis: primary,
+        rankedRoutes: ranked
     };
 }

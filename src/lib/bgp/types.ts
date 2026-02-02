@@ -41,3 +41,8 @@ export interface AnalysisResult {
     steps: StepResult[];
     error?: string;
 }
+
+export interface RankedAnalysis {
+    rankedRoutes: BgpRoute[]; // 0 is winner, 1 is runner-up, etc.
+    primaryAnalysis: AnalysisResult; // The simplified analysis of why #1 beat the rest
+}

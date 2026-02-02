@@ -1,36 +1,38 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { parse } from '@/lib/bgp/parsers';
-import { compareRoutes } from '@/lib/bgp/engine';
-import { AnalysisResult, BgpRoute } from '@/lib/bgp/types';
-import { CheckCircle, Info, Activity, AlertCircle } from 'lucide-react';
+import { analyzeAndRank } from '@/lib/bgp/engine';
+import { AnalysisResult, BgpRoute, RankedAnalysis } from '@/lib/bgp/types';
+import { CheckCircle, Info, Activity, XCircle, Check, ArrowRight, ShieldAlert, Award } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function BgpCalculator() {
     const [input, setInput] = useState('');
-    const [result, setResult] = useState<AnalysisResult | null>(null);
+    const [analysis, setAnalysis] = useState<RankedAnalysis | null>(null);
     const [routes, setRoutes] = useState<BgpRoute[]>([]);
 
     useEffect(() => {
         if (!input.trim()) {
-            setResult(null);
+            setAnalysis(null);
             return;
         }
         try {
             const parsedRoutes = parse(input);
             setRoutes(parsedRoutes);
-            const res = compareRoutes(parsedRoutes); // Assuming generic or auto-detect logic is inside engine/parsers
-            setResult(res);
+            // Use new rank analyzer
+            const res = analyzeAndRank(parsedRoutes);
+            setAnalysis(res);
         } catch (e) {
             console.error(e);
         }
     }, [input]);
 
-    // Helper to extract the value for a specific route in a specific step
-    // Returns { value, status } where status = 'survived' | 'eliminated' | 'previously-eliminated'
-    const getCellData = (stepIndex: number, routeId: string) => {
-        if (!result) return { value: '-', status: 'previously-eliminated' };
+    const getRank = (routeId: string) => {
+        if (!analysis) return -1;
+        return analysis.rankedRoutes.findIndex(r => r.id === routeId) + 1;
+    };
 
+    const getCellData = (stepIndex: number, routeId: string, result: AnalysisResult) => {
         const step = result.steps[stepIndex];
         const candidate = step.candidates.find(c => c.routeId === routeId);
 
@@ -40,8 +42,6 @@ export default function BgpCalculator() {
                 status: candidate.isBest ? 'survived' : 'eliminated'
             };
         }
-
-        // If not in candidates, it was eliminated in a previous step
         return { value: '', status: 'previously-eliminated' };
     };
 
@@ -74,7 +74,7 @@ export default function BgpCalculator() {
                         Path Analysis
                     </h2>
 
-                    {!result ? (
+                    {!analysis ? (
                         <div className="text-center text-slate-400 mt-20">
                             <Info className="w-12 h-12 mx-auto mb-2 opacity-20" />
                             <p>Paste output to begin analysis</p>
@@ -83,7 +83,7 @@ export default function BgpCalculator() {
                         <div className="flex flex-col gap-8">
 
                             {/* Winner Card */}
-                            {result.winner && (
+                            {analysis.rankedRoutes[0] && (
                                 <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-5">
                                     <div className="flex items-start justify-between">
                                         <div>
@@ -91,7 +91,7 @@ export default function BgpCalculator() {
                                                 Best Path Selected
                                             </span>
                                             <h3 className="text-lg font-mono font-bold text-emerald-900 mt-2">
-                                                via {result.winner.nextHop} (Path #{result.winner.index + 1})
+                                                via {analysis.rankedRoutes[0].nextHop} (Path #{analysis.rankedRoutes[0].index + 1})
                                             </h3>
                                         </div>
                                         <CheckCircle className="text-emerald-500 w-8 h-8" />
@@ -99,27 +99,83 @@ export default function BgpCalculator() {
                                 </div>
                             )}
 
+                            {/* AS Path Visualization (Idea 4) */}
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-5">
+                                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">AS Graph Visualization</h3>
+                                <div className="space-y-4">
+                                    {routes.map((r) => {
+                                        const asList = r.asPath ? r.asPath.split(' ') : [];
+                                        return (
+                                            <div key={r.id} className="flex flex-col gap-1">
+                                                <div className="text-xs font-mono font-bold text-slate-600 mb-1">
+                                                    Path #{r.index + 1} ({r.nextHop})
+                                                    {r.id === analysis.rankedRoutes[0].id && (
+                                                        <span className="ml-2 text-emerald-600 bg-emerald-100 px-1.5 rounded text-[10px]">WINNER</span>
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-2 text-sm font-mono">
+
+                                                    {/* Local Router */}
+                                                    <div className="bg-slate-200 text-slate-700 px-2 py-1 rounded border border-slate-300">
+                                                        Local
+                                                    </div>
+                                                    <ArrowRight className="w-3 h-3 text-slate-400" />
+
+                                                    {/* Next Hop */}
+                                                    <div className="bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-200">
+                                                        {r.nextHop}
+                                                    </div>
+
+                                                    {/* AS Path Nodes */}
+                                                    {asList.map((as, idx) => (
+                                                        <React.Fragment key={idx}>
+                                                            <ArrowRight className="w-3 h-3 text-slate-400" />
+                                                            <div className="bg-white text-slate-800 px-2 py-1 rounded border border-slate-300 shadow-sm">
+                                                                AS {as}
+                                                            </div>
+                                                        </React.Fragment>
+                                                    ))}
+
+                                                    {/* Origin */}
+                                                    <ArrowRight className="w-3 h-3 text-slate-400" />
+                                                    <div className="text-slate-500 italic text-xs border border-transparent px-1">
+                                                        ({r.origin})
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
                             {/* Comparison Table */}
                             <div className="overflow-x-auto border border-slate-200 rounded-lg">
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                                         <tr>
                                             <th className="px-4 py-3 whitespace-nowrap min-w-[140px]">Metric / Step</th>
-                                            {routes.map((r, i) => (
-                                                <th key={r.id} className="px-4 py-3 whitespace-nowrap font-mono text-xs">
-                                                    <div className={clsx(
-                                                        "font-bold text-sm mb-1",
-                                                        r.index === result.winner?.index ? "text-emerald-600" : "text-slate-700"
-                                                    )}>
-                                                        Path #{r.index + 1}
-                                                    </div>
-                                                    <div className="text-slate-500">{r.nextHop}</div>
-                                                </th>
-                                            ))}
+                                            {routes.map((r, i) => {
+                                                const rank = getRank(r.id);
+                                                return (
+                                                    <th key={r.id} className="px-4 py-3 whitespace-nowrap font-mono text-xs">
+                                                        <div className={clsx(
+                                                            "font-bold text-sm mb-1 flex items-center gap-1",
+                                                            rank === 1 ? "text-emerald-600" : "text-slate-700"
+                                                        )}>
+                                                            Path #{r.index + 1}
+                                                            {/* Ranking Badge */}
+                                                            {rank === 1 && <Award className="w-4 h-4 text-emerald-500" />}
+                                                            {rank === 2 && <span className="bg-slate-200 text-slate-600 text-[10px] px-1.5 py-0.5 rounded-full">2nd</span>}
+                                                            {rank === 3 && <span className="bg-slate-200 text-slate-600 text-[10px] px-1.5 py-0.5 rounded-full">3rd</span>}
+                                                        </div>
+                                                        <div className="text-slate-500">{r.nextHop}</div>
+                                                    </th>
+                                                );
+                                            })}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 bg-white">
-                                        {result.steps.map((step, stepIdx) => (
+                                        {analysis.primaryAnalysis.steps.map((step, stepIdx) => (
                                             <tr key={stepIdx} className="hover:bg-slate-50/50 transition-colors">
                                                 <td className="px-4 py-3 font-medium text-slate-600">
                                                     {step.stepName}
@@ -130,7 +186,7 @@ export default function BgpCalculator() {
                                                     )}
                                                 </td>
                                                 {routes.map(r => {
-                                                    const { value, status } = getCellData(stepIdx, r.id);
+                                                    const { value, status } = getCellData(stepIdx, r.id, analysis.primaryAnalysis);
                                                     return (
                                                         <td key={r.id} className="px-4 py-3 border-l border-slate-50">
                                                             <div className={clsx(
