@@ -5,6 +5,19 @@ export interface EngineOptions {
     alwaysCompareMed?: boolean;
 }
 
+const STEP_DESCRIPTIONS: Record<string, string> = {
+    'Weight': "Highest Weight is preferred. (Cisco-specific, local to router)",
+    'Local Preference': "Highest Local Preference is preferred. (Local to AS)",
+    'Locally Originated': "Locally originated routes (0.0.0.0) are preferred over learned routes.",
+    'AS Path Length': "Shortest AS Path is preferred.",
+    'Origin Code': "Lowest Origin type is preferred (IGP < EGP < Incomplete).",
+    'MED (BGP Attribute)': "Lowest MED is preferred. (Locally significant to receiving AS)",
+    'eBGP over iBGP': "eBGP paths are preferred over iBGP paths.",
+    'IGP Cost (Internal)': "Lowest IGP cost to the BGP next hop is preferred.",
+    'Router ID': "Lowest Router ID is preferred.",
+    'Peer IP': "Lowest Neighbor Address is preferred. (Final tie-breaker)"
+};
+
 export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco', options: EngineOptions = {}): AnalysisResult {
     if (routes.length === 0) {
         return { steps: [], error: 'No routes provided' };
@@ -55,10 +68,12 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco', opti
 
             if (nextCandidates.length < candidates.length) {
                 const winnerVal = bestVal;
-                // Find a loser specifically from the candidate pool 
                 const loser = candidates.find(c => getValue(c) !== bestVal);
                 const loserVal = loser ? getValue(loser) : '?';
-                reason = `${name}: ${winnerVal} preferred over ${loserVal}`;
+
+                // Enhanced Reason Construction
+                const desc = STEP_DESCRIPTIONS[name] || "";
+                reason = `${name}: ${winnerVal} preferred over ${loserVal}. ${desc}`;
             }
         } else if (candidates.length === 1) {
             reason = '';
@@ -66,9 +81,6 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco', opti
 
         // 4. Record step details for ALL routes
         const stepCandidates: DecisionCandidate[] = allValues.map(item => {
-            // For visualization, a route is "best" at this step if it matches the winning value
-            // AND if it is still a candidate (or would have been if it hadn't lost earlier, but sticking to simple val comp)->
-            // Actually, for the table, we want to know if this specific value was a "winning value".
             const isBestValue = bestVal !== null && item.val === bestVal;
             return {
                 routeId: item.route.id,
@@ -87,7 +99,7 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco', opti
         candidates = nextCandidates;
     };
 
-    // --- STEPS --- (Renamed per user request)
+    // --- STEPS ---
 
     // 1. Weight 
     recordStep('Weight',
@@ -122,7 +134,7 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco', opti
         (a, b) => (a as number) < (b as number)
     );
 
-    // 6. MED (Renamed)
+    // 6. MED (BGP Attribute)
     recordStep('MED (BGP Attribute)',
         r => r.med,
         (a, b) => (a as number) < (b as number)
@@ -134,7 +146,7 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco', opti
         (a, b) => a === 'eBGP' && b === 'iBGP'
     );
 
-    // 8. IGP Metric (Renamed)
+    // 8. IGP Cost (Internal)
     recordStep('IGP Cost (Internal)',
         r => r.igpMetric,
         (a, b) => (a as number) < (b as number)
@@ -171,11 +183,6 @@ export function analyzeAndRank(routes: BgpRoute[], vendor: Vendor = 'cisco', opt
         // Run analysis on current pool
         const res = compareRoutes(pool, vendor, options);
         if (!res.winner) break;
-
-        // Determine specific reason this winner beat the OTHERS in the pool
-        // The reason is effectively the *last* non-tie step in the analysis chain?
-        // Or simply the step where candidates reduced to 1?
-        // The analysis steps array contains 'reason' - the last one that isn't 'Tie' explains the final elimination.
 
         const decidingStep = res.steps.filter(s => s.reason && s.reason !== 'Tie').pop();
         const reason = decidingStep ? decidingStep.reason : 'Only candidate remaining';
