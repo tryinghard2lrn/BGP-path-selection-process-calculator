@@ -1,9 +1,9 @@
 # BGP Calculator - Improvement Tasks
 
 ## In Progress
-- [ ] **Verify Metric vs MED Mapping**
-    - Reading provided blog post.
-    - Confirming CLI output formats (Cisco/Arista).
+- [ ] **UI Refinements (Audio Feedback)**
+    - [ ] Explain "Why #1 Won" explicitly in the summary card.
+    - [ ] Make table cell editability more obvious (visual cues).
 
 ## Backlog
 - [ ] **Community Decoder**
@@ -14,4 +14,6 @@
 - [x] **Core Parser & Engine**
 - [x] **Comparison Matrix UI**
 - [x] **Failover Ranking**
-- [x] **IGP Metric Parsing** (Tentative, verifying)
+- [x] **IGP Metric Parsing**
+- [x] **Interactive Simulation**
+- [x] **Detailed Ranking Explanations** (Partial - need #1)
