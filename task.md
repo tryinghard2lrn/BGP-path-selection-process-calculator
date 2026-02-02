@@ -1,13 +1,17 @@
 # BGP Calculator - Improvement Tasks
 
+## In Progress
+- [ ] **Verify Metric vs MED Mapping**
+    - Reading provided blog post.
+    - Confirming CLI output formats (Cisco/Arista).
+
 ## Backlog
 - [ ] **Community Decoder**
-    - Implement tooltip/lookup for well-known communities (RFC 1997, RFC 7999).
-- [ ] **"What If?" Scenarios** (User interested)
-    - Add UI toggles for `always-compare-med`, `ignore-as-path`, etc.
-- [ ] **AS Path Diagram**
-    - Evaluate Mermaid.js vs React Flow for visualization.
+- [ ] **"What If?" Scenarios** (Implemented `ignoreAsPath`, need more?)
+- [ ] **AS Path Diagram** (Completed)
 
 ## Completed
-- [x] **Core Parser & Engine** (Phase 1)
-- [x] **Comparison Matrix UI** (Phase 1)
+- [x] **Core Parser & Engine**
+- [x] **Comparison Matrix UI**
+- [x] **Failover Ranking**
+- [x] **IGP Metric Parsing** (Tentative, verifying)

@@ -42,7 +42,14 @@ export interface AnalysisResult {
     error?: string;
 }
 
+
+export interface RankedStep {
+    rank: number;
+    route: BgpRoute;
+    reason: string; // concise reason for this specific win
+    subAnalysis: AnalysisResult; // context of this win
+}
+
 export interface RankedAnalysis {
-    rankedRoutes: BgpRoute[]; // 0 is winner, 1 is runner-up, etc.
-    primaryAnalysis: AnalysisResult; // The simplified analysis of why #1 beat the rest
+    ranking: RankedStep[];
 }
