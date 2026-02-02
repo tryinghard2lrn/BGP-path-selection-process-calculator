@@ -8,8 +8,8 @@ export default function Home() {
         {/* Header */}
         <header className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-200">
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              BGP Path Selection <span className="text-blue-600">Calculator</span>
+            <h1 className="text-3xl font-bold text-slate-800">
+              BGP Path Selection Calculator
             </h1>
             <p className="text-slate-500 mt-2 text-lg">
               Visualize the decision process. Paste your <code>show ip bgp</code> comparison.

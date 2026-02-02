@@ -17,3 +17,4 @@
 - [x] **UI Refinements**
 - [x] **Remove Branding**
 - [x] **Example Data Button**
+- [x] **Simplified Header & Removed Animations**
