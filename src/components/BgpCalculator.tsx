@@ -76,6 +76,48 @@ const EditableCell = ({
     );
 };
 
+const EXAMPLE_DATA = `BGP routing table entry for 8.8.8.0/24
+Last Modified: Dec  9 21:10:04.409 for 7w5d
+Paths: (3 available, best #1)
+
+  Path #1: Received by speaker 0
+  1299 15169
+    62.115.35.116 from 62.115.35.116 (2.255.252.25)
+      Origin IGP, localpref 100, valid, external, best, group-best
+Communities: 
+
+1299:430
+    (RPKI state Valid)
+
+1299:4000 1299:20000 1299:20002 1299:20200
+
+
+  Path #2: Received by speaker 0
+  1299 15169
+    81.228.69.237 (metric 2000) from 81.228.63.47 (81.228.65.237)
+      Origin IGP, localpref 100, valid, internal
+Communities: 
+
+1299:430
+    (RPKI state Valid)
+
+1299:4000 1299:20000 1299:20002 1299:20200
+
+      Originator: 81.228.65.237, Cluster list: 81.228.66.11
+
+  Path #3: Received by speaker 0
+  1299 15169
+    81.228.69.237 (metric 2000) from 81.228.63.48 (81.228.65.237)
+      Origin IGP, localpref 100, valid, internal
+Communities: 
+
+1299:430
+    (RPKI state Valid)
+
+1299:4000 1299:20000 1299:20002 1299:20200
+
+      Originator: 81.228.65.237, Cluster list: 81.228.66.12`;
+
 export default function BgpCalculator() {
     const [input, setInput] = useState('');
 
@@ -183,9 +225,17 @@ export default function BgpCalculator() {
             {/* Input Pane */}
             <div className="flex flex-col gap-4">
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Paste BGP Command Output
-                    </label>
+                    <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-medium text-slate-700">
+                            Paste BGP Command Output
+                        </label>
+                        <button
+                            onClick={() => setInput(EXAMPLE_DATA)}
+                            className="bg-blue-100/50 hover:bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded transition-colors font-medium border border-blue-200"
+                        >
+                            Load Example
+                        </button>
+                    </div>
                     <textarea
                         className="w-full h-96 p-4 font-mono text-xs bg-slate-900 text-slate-50 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 outline-none"
                         value={input}
