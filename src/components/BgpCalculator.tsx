@@ -1,15 +1,19 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { parse } from '@/lib/bgp/parsers';
-import { analyzeAndRank } from '@/lib/bgp/engine';
+import { analyzeAndRank, EngineOptions } from '@/lib/bgp/engine';
 import { AnalysisResult, BgpRoute, RankedAnalysis } from '@/lib/bgp/types';
-import { CheckCircle, Info, Activity, XCircle, Check, ArrowRight, ShieldAlert, Award } from 'lucide-react';
+import { CheckCircle, Info, Activity, XCircle, Check, ArrowRight, ShieldAlert, Award, Settings2 } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function BgpCalculator() {
     const [input, setInput] = useState('');
     const [analysis, setAnalysis] = useState<RankedAnalysis | null>(null);
     const [routes, setRoutes] = useState<BgpRoute[]>([]);
+    const [options, setOptions] = useState<EngineOptions>({
+        ignoreAsPathLength: false,
+        alwaysCompareMed: false
+    });
 
     useEffect(() => {
         if (!input.trim()) {
@@ -19,13 +23,13 @@ export default function BgpCalculator() {
         try {
             const parsedRoutes = parse(input);
             setRoutes(parsedRoutes);
-            // Use new rank analyzer
-            const res = analyzeAndRank(parsedRoutes);
+            // Use new rank analyzer with options
+            const res = analyzeAndRank(parsedRoutes, 'auto', options);
             setAnalysis(res);
         } catch (e) {
             console.error(e);
         }
-    }, [input]);
+    }, [input, options]);
 
     const getRank = (routeId: string) => {
         if (!analysis) return -1;
@@ -69,10 +73,31 @@ export default function BgpCalculator() {
             {/* Right Result Pane */}
             <div className="flex flex-col gap-4">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 min-h-[500px]">
-                    <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                        <Activity className="text-blue-600" />
-                        Path Analysis
-                    </h2>
+
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <Activity className="text-blue-600" />
+                            Path Analysis
+                        </h2>
+
+                        {/* What If Configuration */}
+                        <div className="flex items-center gap-4 text-xs">
+                            <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-lg border border-slate-200">
+                                <Settings2 className="w-3 h-3 text-slate-500" />
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        className="rounded text-blue-600 focus:ring-blue-500"
+                                        checked={options.ignoreAsPathLength}
+                                        onChange={(e) => setOptions({ ...options, ignoreAsPathLength: e.target.checked })}
+                                    />
+                                    <span className={clsx(options.ignoreAsPathLength ? "text-slate-900 font-medium" : "text-slate-500")}>
+                                        Ignore AS Path
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
 
                     {!analysis ? (
                         <div className="text-center text-slate-400 mt-20">
@@ -98,55 +123,6 @@ export default function BgpCalculator() {
                                     </div>
                                 </div>
                             )}
-
-                            {/* AS Path Visualization (Idea 4) */}
-                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-5">
-                                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">AS Graph Visualization</h3>
-                                <div className="space-y-4">
-                                    {routes.map((r) => {
-                                        const asList = r.asPath ? r.asPath.split(' ') : [];
-                                        return (
-                                            <div key={r.id} className="flex flex-col gap-1">
-                                                <div className="text-xs font-mono font-bold text-slate-600 mb-1">
-                                                    Path #{r.index + 1} ({r.nextHop})
-                                                    {r.id === analysis.rankedRoutes[0].id && (
-                                                        <span className="ml-2 text-emerald-600 bg-emerald-100 px-1.5 rounded text-[10px]">WINNER</span>
-                                                    )}
-                                                </div>
-                                                <div className="flex flex-wrap items-center gap-2 text-sm font-mono">
-
-                                                    {/* Local Router */}
-                                                    <div className="bg-slate-200 text-slate-700 px-2 py-1 rounded border border-slate-300">
-                                                        Local
-                                                    </div>
-                                                    <ArrowRight className="w-3 h-3 text-slate-400" />
-
-                                                    {/* Next Hop */}
-                                                    <div className="bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-200">
-                                                        {r.nextHop}
-                                                    </div>
-
-                                                    {/* AS Path Nodes */}
-                                                    {asList.map((as, idx) => (
-                                                        <React.Fragment key={idx}>
-                                                            <ArrowRight className="w-3 h-3 text-slate-400" />
-                                                            <div className="bg-white text-slate-800 px-2 py-1 rounded border border-slate-300 shadow-sm">
-                                                                AS {as}
-                                                            </div>
-                                                        </React.Fragment>
-                                                    ))}
-
-                                                    {/* Origin */}
-                                                    <ArrowRight className="w-3 h-3 text-slate-400" />
-                                                    <div className="text-slate-500 italic text-xs border border-transparent px-1">
-                                                        ({r.origin})
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
 
                             {/* Comparison Table */}
                             <div className="overflow-x-auto border border-slate-200 rounded-lg">
@@ -195,7 +171,7 @@ export default function BgpCalculator() {
                                                                 status === 'eliminated' && "bg-red-50 text-red-700 line-through decoration-red-400 opacity-70",
                                                                 status === 'previously-eliminated' && "text-slate-300"
                                                             )}>
-                                                                {value || '—'}
+                                                                {value === 'true' ? 'Yes' : value === 'false' ? 'No' : (value || '—')}
                                                             </div>
                                                         </td>
                                                     );
@@ -204,6 +180,55 @@ export default function BgpCalculator() {
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+
+                            {/* AS Path Visualization (Moved to Bottom) */}
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-5">
+                                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">AS Graph Visualization</h3>
+                                <div className="space-y-4">
+                                    {routes.map((r) => {
+                                        const asList = r.asPath ? r.asPath.split(' ') : [];
+                                        return (
+                                            <div key={r.id} className="flex flex-col gap-1">
+                                                <div className="text-xs font-mono font-bold text-slate-600 mb-1">
+                                                    Path #{r.index + 1} ({r.nextHop})
+                                                    {r.id === analysis.rankedRoutes[0].id && (
+                                                        <span className="ml-2 text-emerald-600 bg-emerald-100 px-1.5 rounded text-[10px]">WINNER</span>
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-2 text-sm font-mono">
+
+                                                    {/* Local Router */}
+                                                    <div className="bg-slate-200 text-slate-700 px-2 py-1 rounded border border-slate-300">
+                                                        Local
+                                                    </div>
+                                                    <ArrowRight className="w-3 h-3 text-slate-400" />
+
+                                                    {/* Next Hop */}
+                                                    <div className="bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-200">
+                                                        {r.nextHop}
+                                                    </div>
+
+                                                    {/* AS Path Nodes */}
+                                                    {asList.map((as, idx) => (
+                                                        <React.Fragment key={idx}>
+                                                            <ArrowRight className="w-3 h-3 text-slate-400" />
+                                                            <div className="bg-white text-slate-800 px-2 py-1 rounded border border-slate-300 shadow-sm">
+                                                                AS {as}
+                                                            </div>
+                                                        </React.Fragment>
+                                                    ))}
+
+                                                    {/* Origin */}
+                                                    <ArrowRight className="w-3 h-3 text-slate-400" />
+                                                    <div className="text-slate-500 italic text-xs border border-transparent px-1">
+                                                        ({r.origin})
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                         </div>

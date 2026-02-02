@@ -62,7 +62,9 @@ function parseCiscoDetailed(input: string): BgpRoute[] {
         const pathMatch = line.match(/^\s*Path\s+#\d+:/i);
 
         // 2. Check for "from" line (Legacy IOS or compact)
-        const fromMatch = line.match(/^\s+([0-9.]+)(?:\s+\(.*\))?\s+from\s+([0-9.]+)\s+\(([0-9.]+)\)/);
+        // matches "   1.2.3.4 from 2.2.2.2 (3.3.3.3)" OR "   1.2.3.4 (metric 20) from ..."
+        // Revised RegEx to capture the optional metric part
+        const fromMatch = line.match(/^\s+([0-9.]+)(?:\s+\(metric\s+(\d+)\))?\s+from\s+([0-9.]+)\s+\(([0-9.]+)\)/);
 
         if (pathMatch) {
             // Explicit header always force-starts a new path
@@ -89,8 +91,12 @@ function parseCiscoDetailed(input: string): BgpRoute[] {
 
             if (fromMatch) {
                 currentRoute.nextHop = fromMatch[1];
-                currentRoute.peerIp = fromMatch[2];
-                currentRoute.routerId = fromMatch[3];
+                // capture group 2 is the metric if present
+                if (fromMatch[2]) {
+                    currentRoute.igpMetric = parseInt(fromMatch[2]);
+                }
+                currentRoute.peerIp = fromMatch[3];
+                currentRoute.routerId = fromMatch[4];
 
                 // Backtrack for AS Path
                 let prev = lines[i - 1];

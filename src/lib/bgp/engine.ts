@@ -1,6 +1,12 @@
 import { BgpRoute, AnalysisResult, StepResult, Vendor, DecisionCandidate, RankedAnalysis } from './types';
 
-export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco'): AnalysisResult {
+export interface EngineOptions {
+    ignoreAsPathLength?: boolean;
+    alwaysCompareMed?: boolean;
+    // Add more toggles here as needed
+}
+
+export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco', options: EngineOptions = {}): AnalysisResult {
     if (routes.length === 0) {
         return { steps: [], error: 'No routes provided' };
     }
@@ -67,7 +73,6 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco'): Ana
     };
 
     // --- STEPS ---
-    // (Existing steps...)
 
     // 1. Weight (High is better)
     recordStep('Weight',
@@ -88,10 +93,17 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco'): Ana
     );
 
     // 4. AS Path Length (Low is better)
-    recordStep('AS Path Length',
-        r => r.asPathLength,
-        (a, b) => (a as number) < (b as number)
-    );
+    if (!options.ignoreAsPathLength) {
+        recordStep('AS Path Length',
+            r => r.asPathLength,
+            (a, b) => (a as number) < (b as number)
+        );
+    } else {
+        // Record as skipped or just don't record? Better to record as skipped for visibility?
+        // For simplicity in UI matrix, let's skip logical evaluation but maybe we need a visual indicator.
+        // User asked to "ignore 1".
+        // Let's just NOT call recordStep.
+    }
 
     // 5. Origin Code (IGP < EGP < Incomplete)
     // Map to number 0, 1, 2. Low is better.
@@ -142,9 +154,9 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco'): Ana
     };
 }
 
-export function analyzeAndRank(routes: BgpRoute[], vendor: Vendor = 'cisco'): RankedAnalysis {
+export function analyzeAndRank(routes: BgpRoute[], vendor: Vendor = 'cisco', options: EngineOptions = {}): RankedAnalysis {
     // 1. Run primary analysis on the full set
-    const primary = compareRoutes(routes, vendor);
+    const primary = compareRoutes(routes, vendor, options);
 
     // 2. Recursively find the ranking
     const pool = [...routes];
@@ -152,7 +164,7 @@ export function analyzeAndRank(routes: BgpRoute[], vendor: Vendor = 'cisco'): Ra
 
     while (pool.length > 0) {
         // Find best in current pool
-        const res = compareRoutes(pool, vendor);
+        const res = compareRoutes(pool, vendor, options);
         if (!res.winner) break; // Should not happen
 
         ranked.push(res.winner);
