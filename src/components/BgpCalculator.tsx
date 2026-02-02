@@ -251,12 +251,8 @@ export default function BgpCalculator() {
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                             <Activity className="text-blue-600" />
-                            Simulation Matrix
+                            Path Analysis
                         </h2>
-                        <div className="flex items-center gap-2 text-xs text-slate-500 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full border border-blue-100 animate-pulse">
-                            <Edit2 className="w-3 h-3" />
-                            <span>Tap any value to edit & simulate</span>
-                        </div>
                     </div>
 
                     {!analysis ? (

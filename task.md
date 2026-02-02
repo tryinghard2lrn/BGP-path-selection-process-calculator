@@ -13,6 +13,7 @@
 - [x] **Failover Ranking**
 - [x] **IGP Metric Parsing**
 - [x] **Interactive Simulation**
-- [x] **Detailed Ranking Explanations** (Winner & Runners-up)
-- [x] **UI Refinements** (Edit cues, "Why #1 Won")
-- [x] **Remove Branding** (Header cleanup)
+- [x] **Detailed Ranking Explanations**
+- [x] **UI Refinements**
+- [x] **Remove Branding**
+- [x] **Example Data Button**
