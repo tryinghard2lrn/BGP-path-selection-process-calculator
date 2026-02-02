@@ -3,7 +3,6 @@ import { BgpRoute, AnalysisResult, StepResult, Vendor, DecisionCandidate, Ranked
 export interface EngineOptions {
     ignoreAsPathLength?: boolean;
     alwaysCompareMed?: boolean;
-    // Add more toggles here as needed
 }
 
 export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco', options: EngineOptions = {}): AnalysisResult {
@@ -17,50 +16,80 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco', opti
     // Helper to record a step with detailed candidates
     const recordStep = (
         name: string,
-        // Function that returns the RAW value for comparison (e.g. 100 for LP)
+        // Function that returns the RAW value for comparison
         getValue: (r: BgpRoute) => string | number | boolean,
         // Function to determine if a value is "better" than another
         // Returns true if 'a' is fundamentally better than 'b'
         isBetter: (a: string | number | boolean, b: string | number | boolean) => boolean
     ) => {
-        if (candidates.length <= 1) return;
-
-        // 1. Calculate values for all current candidates
-        const candidateValues = candidates.map(r => ({
+        // 1. Calculate values for ALL input routes (for table visualization)
+        // We use 'routes' (global scope from func args) to ensure we get data for eliminated paths too
+        const allValues = routes.map(r => ({
             route: r,
             val: getValue(r)
         }));
 
-        // 2. Determine the "best" value found among candidates
-        // We assume the first one is best initially, then iterate
-        let bestVal = candidateValues[0].val;
-        for (let i = 1; i < candidateValues.length; i++) {
-            if (isBetter(candidateValues[i].val, bestVal)) {
-                bestVal = candidateValues[i].val;
+        // 2. Determine the "best" value permissible among current CANDIDATES (survivors)
+        // If candidates is empty (shouldn't happen) or 1, we still calculate relative best for consistent highlighting
+        // But strictly, we only care about candidates for the decision.
+
+        let bestVal: string | number | boolean | null = null;
+
+        if (candidates.length > 0) {
+            const candidateValues = candidates.map(c => ({
+                route: c,
+                val: getValue(c)
+            }));
+
+            bestVal = candidateValues[0].val;
+            for (let i = 1; i < candidateValues.length; i++) {
+                if (isBetter(candidateValues[i].val, bestVal!)) {
+                    bestVal = candidateValues[i].val;
+                }
             }
         }
 
-        // 3. Filter winners (those matching the best value)
-        const nextCandidates = candidateValues
-            .filter(item => item.val === bestVal)
-            .map(item => item.route);
-
-        // 4. Record the step details for ALL candidates (even those about to be dropped)
-        const stepCandidates: DecisionCandidate[] = candidateValues.map(item => ({
-            routeId: item.route.id,
-            value: item.val,
-            isBest: item.val === bestVal
-        }));
-
-        // 5. Generate a reason string if we dropped someone
+        // 3. Filter next round candidates
+        // If we have >1 candidates, we filter them. If we have 1, it stays 1.
+        let nextCandidates = candidates;
         let reason = 'Tie';
-        if (nextCandidates.length < candidates.length) {
-            const winner = candidateValues.find(c => c.val === bestVal);
-            const loser = candidateValues.find(c => c.val !== bestVal);
-            if (winner && loser) {
-                reason = `${name}: ${winner.val} preferred over ${loser.val}`;
+
+        if (candidates.length > 1 && bestVal !== null) {
+            nextCandidates = candidates.filter(c => {
+                const val = getValue(c);
+                return val === bestVal;
+            });
+
+            // Generate reason if drops happened
+            if (nextCandidates.length < candidates.length) {
+                // Find a loser specifically from the candidate pool for accurate reason
+                const winnerVal = bestVal;
+                // A loser is someone in 'candidates' who didn't match 'bestVal'
+                const loser = candidates.find(c => getValue(c) !== bestVal);
+                const loserVal = loser ? getValue(loser) : '?';
+
+                reason = `${name}: ${winnerVal} preferred over ${loserVal}`;
             }
+        } else if (candidates.length === 1) {
+            // Already won previous round
+            reason = ''; // No decision made here
         }
+
+        // 4. Record step details for ALL routes
+        // For visualization:
+        // - isBest: Matches the 'bestVal' (so it would have survived if it were alive)
+        //           OR matches the value of the actual winner?
+        //           Let's say isBest = matches bestVal.
+
+        const stepCandidates: DecisionCandidate[] = allValues.map(item => {
+            // Safe fallback if bestVal is null (no candidates? impossible in normal flow)
+            const isBestValue = bestVal !== null && item.val === bestVal;
+            return {
+                routeId: item.route.id,
+                value: item.val,
+                isBest: isBestValue
+            };
+        });
 
         steps.push({
             stepName: name,
@@ -68,7 +97,7 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco', opti
             reason
         });
 
-        // 6. Update candidates for next round
+        // 5. Update candidates
         candidates = nextCandidates;
     };
 
@@ -93,20 +122,20 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco', opti
     );
 
     // 4. AS Path Length (Low is better)
+    // Even if ignored for decision, we might want to show it? 
+    // If ignored, standard practice is it effectively acts as a Tie (all equal).
+    // Let's handle 'ignoreAsPathLength' by mocking equality in 'isBetter' or strictly skipping?
+    // User wants to toggle. If ignored, maybe better to SKIP the step entirely in the table?
+    // Or show it but say "Ignored"? 
+    // Let's skip recording if ignored, as per previous implementation logic.
     if (!options.ignoreAsPathLength) {
         recordStep('AS Path Length',
             r => r.asPathLength,
             (a, b) => (a as number) < (b as number)
         );
-    } else {
-        // Record as skipped or just don't record? Better to record as skipped for visibility?
-        // For simplicity in UI matrix, let's skip logical evaluation but maybe we need a visual indicator.
-        // User asked to "ignore 1".
-        // Let's just NOT call recordStep.
     }
 
-    // 5. Origin Code (IGP < EGP < Incomplete)
-    // Map to number 0, 1, 2. Low is better.
+    // 5. Origin Code (Low is better)
     const originScore = (o: string) => o === 'IGP' ? 0 : o === 'EGP' ? 1 : 2;
     recordStep('Origin Code',
         r => originScore(r.origin),
@@ -135,12 +164,12 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco', opti
     // 9. Router ID (Low is better)
     recordStep('Router ID',
         r => r.routerId,
-        (a, b) => { // generic string compare numeric-like
+        (a, b) => {
             return (a as string).localeCompare((b as string), undefined, { numeric: true }) < 0;
         }
     );
 
-    // 10. Peer IP (Low is better) - final tie breaker
+    // 10. Peer IP (Low is better)
     recordStep('Peer IP',
         r => r.peerIp,
         (a, b) => {
@@ -155,21 +184,14 @@ export function compareRoutes(routes: BgpRoute[], vendor: Vendor = 'cisco', opti
 }
 
 export function analyzeAndRank(routes: BgpRoute[], vendor: Vendor = 'cisco', options: EngineOptions = {}): RankedAnalysis {
-    // 1. Run primary analysis on the full set
     const primary = compareRoutes(routes, vendor, options);
-
-    // 2. Recursively find the ranking
     const pool = [...routes];
     const ranked: BgpRoute[] = [];
 
     while (pool.length > 0) {
-        // Find best in current pool
         const res = compareRoutes(pool, vendor, options);
-        if (!res.winner) break; // Should not happen
-
+        if (!res.winner) break;
         ranked.push(res.winner);
-
-        // Remove winner from pool
         const idx = pool.findIndex(r => r.id === res.winner!.id);
         if (idx !== -1) pool.splice(idx, 1);
     }
