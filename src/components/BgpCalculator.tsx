@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { parse } from '@/lib/bgp/parsers';
 import { compareRoutes } from '@/lib/bgp/engine';
 import { AnalysisResult, BgpRoute } from '@/lib/bgp/types';
-import { CheckCircle, Info, Activity, XCircle, Check } from 'lucide-react';
+import { CheckCircle, Info, Activity, AlertCircle } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function BgpCalculator() {
@@ -19,17 +19,30 @@ export default function BgpCalculator() {
         try {
             const parsedRoutes = parse(input);
             setRoutes(parsedRoutes);
-            const res = compareRoutes(parsedRoutes);
+            const res = compareRoutes(parsedRoutes); // Assuming generic or auto-detect logic is inside engine/parsers
             setResult(res);
         } catch (e) {
             console.error(e);
-            // Fail gracefully
         }
     }, [input]);
 
-    const getRouteName = (id: string) => {
-        const r = routes.find(x => x.id === id);
-        return r ? `Path #${r.index + 1}` : id;
+    // Helper to extract the value for a specific route in a specific step
+    // Returns { value, status } where status = 'survived' | 'eliminated' | 'previously-eliminated'
+    const getCellData = (stepIndex: number, routeId: string) => {
+        if (!result) return { value: '-', status: 'previously-eliminated' };
+
+        const step = result.steps[stepIndex];
+        const candidate = step.candidates.find(c => c.routeId === routeId);
+
+        if (candidate) {
+            return {
+                value: String(candidate.value),
+                status: candidate.isBest ? 'survived' : 'eliminated'
+            };
+        }
+
+        // If not in candidates, it was eliminated in a previous step
+        return { value: '', status: 'previously-eliminated' };
     };
 
     return (
@@ -67,82 +80,74 @@ export default function BgpCalculator() {
                             <p>Paste output to begin analysis</p>
                         </div>
                     ) : (
-                        <div className="flex flex-col gap-6">
+                        <div className="flex flex-col gap-8">
 
                             {/* Winner Card */}
                             {result.winner && (
                                 <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-5">
-                                    <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-start justify-between">
                                         <div>
                                             <span className="bg-emerald-200 text-emerald-800 text-xs font-bold px-2 py-1 rounded uppercase tracking-wider">
                                                 Best Path Selected
                                             </span>
                                             <h3 className="text-lg font-mono font-bold text-emerald-900 mt-2">
-                                                Path #{result.winner.index + 1} via {result.winner.nextHop}
+                                                via {result.winner.nextHop} (Path #{result.winner.index + 1})
                                             </h3>
-                                            <div className="text-sm text-emerald-700">
-                                                Neighbor: {result.winner.peerIp || 'N/A'} (Router ID: {result.winner.routerId})
-                                            </div>
                                         </div>
                                         <CheckCircle className="text-emerald-500 w-8 h-8" />
-                                    </div>
-
-                                    {/* Winning Stats */}
-                                    <div className="grid grid-cols-2 gap-y-2 text-sm text-emerald-800/80 font-mono">
-                                        <div>Local Pref: {result.winner.localPref}</div>
-                                        <div>Weight: {result.winner.weight}</div>
-                                        <div>AS Path: {result.winner.asPath} ({result.winner.asPathLength})</div>
-                                        <div>MED: {result.winner.med}</div>
-                                        <div>Origin: {result.winner.origin}</div>
-                                        <div>Type: {result.winner.isIbgp ? 'iBGP' : 'eBGP'}</div>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Detailed Decision Matrix */}
-                            <div>
-                                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Decision Breakdown</h3>
-                                <div className="space-y-4">
-                                    {result.steps.map((step, idx) => (
-                                        <div key={idx} className="border border-slate-100 rounded-lg overflow-hidden">
-                                            {/* Step Header */}
-                                            <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex justify-between items-center">
-                                                <span className="font-semibold text-slate-700 text-sm">
-                                                    {idx + 1}. {step.stepName}
-                                                </span>
-                                                {step.reason !== 'Tie' && (
-                                                    <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-                                                        {step.reason}
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {/* Candidates List */}
-                                            <div className="divide-y divide-slate-50">
-                                                {step.candidates.map((cand) => (
-                                                    <div key={cand.routeId} className={clsx(
-                                                        "flex items-center justify-between px-4 py-2 text-sm",
-                                                        cand.isBest ? "bg-white" : "bg-slate-50/50 opacity-60"
+                            {/* Comparison Table */}
+                            <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-4 py-3 whitespace-nowrap min-w-[140px]">Metric / Step</th>
+                                            {routes.map((r, i) => (
+                                                <th key={r.id} className="px-4 py-3 whitespace-nowrap font-mono text-xs">
+                                                    <div className={clsx(
+                                                        "font-bold text-sm mb-1",
+                                                        r.index === result.winner?.index ? "text-emerald-600" : "text-slate-700"
                                                     )}>
-                                                        <div className="flex items-center gap-2">
-                                                            {cand.isBest ? (
-                                                                <Check className="w-4 h-4 text-emerald-500" />
-                                                            ) : (
-                                                                <XCircle className="w-4 h-4 text-red-400" />
-                                                            )}
-                                                            <span className={clsx("font-mono", cand.isBest ? "text-slate-800" : "text-slate-500")}>
-                                                                {getRouteName(cand.routeId)}
-                                                            </span>
-                                                        </div>
-                                                        <div className="font-mono font-medium">
-                                                            {String(cand.value)}
-                                                        </div>
+                                                        Path #{r.index + 1}
                                                     </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
+                                                    <div className="text-slate-500">{r.nextHop}</div>
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 bg-white">
+                                        {result.steps.map((step, stepIdx) => (
+                                            <tr key={stepIdx} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-4 py-3 font-medium text-slate-600">
+                                                    {step.stepName}
+                                                    {step.reason !== 'Tie' && (
+                                                        <div className="text-xs text-blue-500 font-normal mt-0.5 max-w-[150px] leading-tight">
+                                                            {step.reason}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                {routes.map(r => {
+                                                    const { value, status } = getCellData(stepIdx, r.id);
+                                                    return (
+                                                        <td key={r.id} className="px-4 py-3 border-l border-slate-50">
+                                                            <div className={clsx(
+                                                                "font-mono rounded px-2 py-1 inline-block",
+                                                                status === 'survived' && "bg-emerald-50 text-emerald-700 font-bold",
+                                                                status === 'eliminated' && "bg-red-50 text-red-700 line-through decoration-red-400 opacity-70",
+                                                                status === 'previously-eliminated' && "text-slate-300"
+                                                            )}>
+                                                                {value || '—'}
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
 
                         </div>
