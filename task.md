@@ -1,14 +1,11 @@
 # BGP Calculator - Improvement Tasks
 
 ## In Progress
-- [ ] **UI Refinements (Audio Feedback)**
-    - [ ] Explain "Why #1 Won" explicitly in the summary card.
-    - [ ] Make table cell editability more obvious (visual cues).
+- [ ] **Community Decoder**
 
 ## Backlog
-- [ ] **Community Decoder**
 - [ ] **"What If?" Scenarios** (Implemented `ignoreAsPath`, need more?)
-- [ ] **AS Path Diagram** (Completed)
+- [ ] **Export Options** (CSV/JSON)
 
 ## Completed
 - [x] **Core Parser & Engine**
@@ -16,4 +13,6 @@
 - [x] **Failover Ranking**
 - [x] **IGP Metric Parsing**
 - [x] **Interactive Simulation**
-- [x] **Detailed Ranking Explanations** (Partial - need #1)
+- [x] **Detailed Ranking Explanations** (Winner & Runners-up)
+- [x] **UI Refinements** (Edit cues, "Why #1 Won")
+- [x] **Remove Branding** (Header cleanup)

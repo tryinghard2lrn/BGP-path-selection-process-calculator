@@ -17,7 +17,7 @@ export default function Home() {
           </div>
           <div className="mt-4 md:mt-0">
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-200 text-slate-600">
-              v1.0 • Antigravity
+              v1.0
             </span>
           </div>
         </header>
